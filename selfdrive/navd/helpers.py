@@ -165,20 +165,39 @@ def parse_banner_instructions(banners: Any, distance_to_maneuver: float = 0.0) -
     instruction['maneuverModifier'] = p['modifier']
   if field_valid(p, 'degrees'):
     maneuverDegrees = int(p['degrees'])
+    drivingSide = p['driving_side']
     if maneuverDegrees <=  67:
-      instruction['maneuverModifier'] = "sharp right"
+      if drivingSide == "right": 
+        instruction['maneuverModifier'] = "sharp right"
+      else: 
+        instruction['maneuverModifier'] = "sharp left"
     elif maneuverDegrees <= 112:
-      instruction['maneuverModifier'] = "right"
+      if drivingSide == "right": 
+        instruction['maneuverModifier'] = "right"
+      else: 
+        instruction['maneuverModifier'] = "left"
     elif maneuverDegrees <= 157:
-      instruction['maneuverModifier'] = "slight right"
+      if drivingSide == "right": 
+        instruction['maneuverModifier'] = "slight right"
+      else: 
+        instruction['maneuverModifier'] = "slight left"
     elif maneuverDegrees <= 202:
-      instruction['maneuverModifier'] = "straight"
+      instruction['maneuverModifier'] = "straight" 
     elif maneuverDegrees <= 247:
-      instruction['maneuverModifier'] = "slight left"
+      if drivingSide == "right": 
+        instruction['maneuverModifier'] = "slight left"
+      else: 
+        instruction['maneuverModifier'] = "slight right"
     elif maneuverDegrees <= 292:
-      instruction['maneuverModifier'] = "left"
+      if drivingSide == "right": 
+        instruction['maneuverModifier'] = "left"
+      else: 
+        instruction['maneuverModifier'] = "right"
     elif maneuverDegrees <= 360:
-      instruction['maneuverModifier'] = "sharp left"
+      if drivingSide == "right": 
+        instruction['maneuverModifier'] = "sharp left"
+      else: 
+        instruction['maneuverModifier'] = "sharp right"
     else:
       instruction['maneuverModifier'] = p['modifier']
 
