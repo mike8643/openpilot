@@ -166,42 +166,20 @@ def parse_banner_instructions(banners: Any, distance_to_maneuver: float = 0.0) -
   if field_valid(p, 'degrees'):
     maneuverDegrees = int(p['degrees'])
     drivingSide = p['driving_side']
-    if maneuverDegrees <=  67:
-      if drivingSide == "right": 
-        instruction['maneuverModifier'] = "sharp right"
-      else: 
-        instruction['maneuverModifier'] = "sharp left"
-    elif maneuverDegrees <= 112:
-      if drivingSide == "right": 
-        instruction['maneuverModifier'] = "right"
-      else: 
-        instruction['maneuverModifier'] = "left"
-    elif maneuverDegrees <= 157:
-      if drivingSide == "right": 
-        instruction['maneuverModifier'] = "slight right"
-      else: 
-        instruction['maneuverModifier'] = "slight left"
-    elif maneuverDegrees <= 202:
-      instruction['maneuverModifier'] = "straight" 
-    elif maneuverDegrees <= 247:
-      if drivingSide == "right": 
-        instruction['maneuverModifier'] = "slight left"
-      else: 
-        instruction['maneuverModifier'] = "slight right"
-    elif maneuverDegrees <= 292:
-      if drivingSide == "right": 
-        instruction['maneuverModifier'] = "left"
-      else: 
-        instruction['maneuverModifier'] = "right"
-    elif maneuverDegrees <= 360:
-      if drivingSide == "right": 
-        instruction['maneuverModifier'] = "sharp left"
-      else: 
-        instruction['maneuverModifier'] = "sharp right"
-    else:
-      instruction['maneuverModifier'] = p['modifier']
-
-
+    modifier1 = ""
+    modifier2 = ""
+    if (0 <= maneuverDegrees <= 67) or (292 < maneuverDegrees <= 360):
+      modifier1 = "sharp "
+    elif (112 < maneuverDegrees <= 157) or (202 < maneuverDegrees <= 247):
+      modifier1 = "slight "
+    if 0 <= maneuverDegrees <= 157:
+      modifier2 = drivingSide
+    elif 157 < maneuverDegrees <= 202:
+      modifier2 = "straight"
+    elif 202 < maneuverDegrees <= 360:
+      modifier2 = "left" if drivingSide == "right" else "right"
+    instruction['maneuverModifier'] = modifier1 + modifier2
+    
   # Secondary
   if field_valid(current_banner, 'secondary'):
     instruction['maneuverSecondaryText'] = current_banner['secondary']['text']
