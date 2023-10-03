@@ -3,12 +3,12 @@ from parameterized import parameterized
 import unittest
 
 from cereal import log, messaging
-from selfdrive.car.car_helpers import FRAME_FINGERPRINT, can_fingerprint
-from selfdrive.car.fingerprints import _FINGERPRINTS as FINGERPRINTS
+from openpilot.selfdrive.car.car_helpers import FRAME_FINGERPRINT, can_fingerprint
+from openpilot.selfdrive.car.fingerprints import _FINGERPRINTS as FINGERPRINTS
 
 
 class TestCanFingerprint(unittest.TestCase):
-  @parameterized.expand([(c, f) for c, f in FINGERPRINTS.items()])
+  @parameterized.expand(list(FINGERPRINTS.items()))
   def test_can_fingerprint(self, car_model, fingerprints):
     """Tests online fingerprinting function on offline fingerprints"""
 

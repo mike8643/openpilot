@@ -14,25 +14,37 @@ import capnp
 
 import cereal.messaging as messaging
 from cereal import car
-from cereal.services import service_list
+from cereal.services import SERVICE_LIST
 from cereal.visionipc import VisionIpcServer, get_endpoint_name as vipc_get_endpoint_name
-from common.params import Params
-from common.timeout import Timeout
-from common.realtime import DT_CTRL
+from openpilot.common.params import Params
+from openpilot.common.prefix import OpenpilotPrefix
+from openpilot.common.timeout import Timeout
+from openpilot.common.realtime import DT_CTRL
 from panda.python import ALTERNATIVE_EXPERIENCE
-from selfdrive.car.car_helpers import get_car, interfaces
-from selfdrive.manager.process_config import managed_processes
-from selfdrive.test.process_replay.helpers import OpenpilotPrefix, DummySocket
-from selfdrive.test.process_replay.vision_meta import meta_from_camera_state, available_streams
-from selfdrive.test.process_replay.migration import migrate_all
-from selfdrive.test.process_replay.capture import ProcessOutputCapture
-from tools.lib.logreader import LogReader
+from openpilot.selfdrive.car.car_helpers import get_car, interfaces
+from openpilot.selfdrive.manager.process_config import managed_processes
+from openpilot.selfdrive.test.process_replay.vision_meta import meta_from_camera_state, available_streams
+from openpilot.selfdrive.test.process_replay.migration import migrate_all
+from openpilot.selfdrive.test.process_replay.capture import ProcessOutputCapture
+from openpilot.tools.lib.logreader import LogReader
 
 # Numpy gives different results based on CPU features after version 19
 NUMPY_TOLERANCE = 1e-7
 PROC_REPLAY_DIR = os.path.dirname(os.path.abspath(__file__))
 FAKEDATA = os.path.join(PROC_REPLAY_DIR, "fakedata/")
 
+class DummySocket:
+  def __init__(self):
+    self.data: List[bytes] = []
+
+  def receive(self, non_blocking: bool = False) -> Optional[bytes]:
+    if non_blocking:
+      return None
+
+    return self.data.pop()
+
+  def send(self, data: bytes):
+    self.data.append(data)
 
 class LauncherWithCapture:
   def __init__(self, capture: ProcessOutputCapture, launcher: Callable):
@@ -123,7 +135,6 @@ class ProcessConfig:
   should_recv_callback: Optional[Callable] = None
   tolerance: Optional[float] = None
   processing_time: float = 0.001
-  field_tolerances: Dict[str, float] = field(default_factory=dict)
   timeout: int = 30
   simulation: bool = True
   main_pub: Optional[str] = None
@@ -144,6 +155,7 @@ class ProcessContainer:
     self.sockets: Optional[List[messaging.SubSocket]] = None
     self.rc: Optional[ReplayContext] = None
     self.vipc_server: Optional[VisionIpcServer] = None
+    self.environ_config: Optional[Dict[str, Any]] = None
     self.capture: Optional[ProcessOutputCapture] = None
 
   @property
@@ -157,6 +169,15 @@ class ProcessContainer:
   @property
   def subs(self) -> List[str]:
     return self.cfg.subs
+
+  def _clean_env(self):
+    for k in self.environ_config.keys():
+      if k in os.environ:
+        del os.environ[k]
+
+    for k in ["PROC_NAME", "SIMULATION"]:
+      if k in os.environ:
+        del os.environ[k]
 
   def _setup_env(self, params_config: Dict[str, Any], environ_config: Dict[str, Any]):
     for k, v in environ_config.items():
@@ -178,10 +199,12 @@ class ProcessContainer:
       else:
         params.put(k, v)
 
+    self.environ_config = environ_config
+
   def _setup_vision_ipc(self, all_msgs):
     assert len(self.cfg.vision_pubs) != 0
 
-    device_type = next(msg.initData.deviceType for msg in all_msgs if msg.which() == "initData")
+    device_type = next(str(msg.initData.deviceType) for msg in all_msgs if msg.which() == "initData")
 
     vipc_server = VisionIpcServer("camerad")
     streams_metas = available_streams(all_msgs)
@@ -191,6 +214,7 @@ class ProcessContainer:
     vipc_server.start_listener()
 
     self.vipc_server = vipc_server
+    self.cfg.vision_pubs = [meta.camera_state for meta in streams_metas if meta.camera_state in self.cfg.vision_pubs]
 
   def _start_process(self):
     if self.capture is not None:
@@ -239,6 +263,7 @@ class ProcessContainer:
       self.process.stop()
       self.rc.close_context()
       self.prefix.clean_dirs()
+      self._clean_env()
 
   def run_step(self, msg: capnp._DynamicStructReader, frs: Optional[Dict[str, Any]]) -> List[capnp._DynamicStructReader]:
     assert self.rc and self.pm and self.sockets and self.process.proc
@@ -340,7 +365,7 @@ def controlsd_rcv_callback(msg, cfg, frame):
 
   socks = [
     s for s in cfg.subs if
-    frame % int(service_list[msg.which()].frequency / service_list[s].frequency) == 0
+    frame % int(SERVICE_LIST[msg.which()].frequency / SERVICE_LIST[s].frequency) == 0
   ]
   if "sendcan" in socks and (frame - 1) < 2000:
     socks.remove("sendcan")
@@ -369,9 +394,8 @@ class ModeldCameraSyncRcvCallback:
     self.is_dual_camera = True
 
   def __call__(self, msg, cfg, frame):
-    if msg.which() == "initData":
-      self.is_dual_camera = msg.initData.deviceType in ["tici", "tizi"]
-    elif msg.which() == "roadCameraState":
+    self.is_dual_camera = len(cfg.vision_pubs) == 2
+    if msg.which() == "roadCameraState":
       self.road_present = True
     elif msg.which() == "wideRoadCameraState":
       self.wide_road_present = True
@@ -404,7 +428,7 @@ class FrequencyBasedRcvCallback:
 
     resp_sockets = [
       s for s in cfg.subs
-      if frame % max(1, int(service_list[msg.which()].frequency / service_list[s].frequency)) == 0
+      if frame % max(1, int(SERVICE_LIST[msg.which()].frequency / SERVICE_LIST[s].frequency)) == 0
     ]
     return bool(len(resp_sockets))
 
@@ -448,7 +472,7 @@ CONFIGS = [
       "can", "deviceState", "pandaStates", "peripheralState", "liveCalibration", "driverMonitoringState",
       "longitudinalPlan", "lateralPlan", "liveLocationKalman", "liveParameters", "radarState",
       "modelV2", "driverCameraState", "roadCameraState", "wideRoadCameraState", "managerState",
-      "testJoystick", "liveTorqueParameters"
+      "testJoystick", "liveTorqueParameters", "accelerometer", "gyroscope"
     ],
     subs=["controlsState", "carState", "carControl", "sendcan", "carEvents", "carParams"],
     ignore=["logMonoTime", "valid", "controlsState.startMonoTime", "controlsState.cumLagMs"],
@@ -657,14 +681,13 @@ def _replay_multi_process(
     env_config = generate_environ_config(CP=CP)
 
   # validate frs and vision pubs
-  for cfg in cfgs:
-    if len(cfg.vision_pubs) == 0:
-      continue
-
+  all_vision_pubs = [pub for cfg in cfgs for pub in cfg.vision_pubs]
+  if len(all_vision_pubs) != 0:
     assert frs is not None, "frs must be provided when replaying process using vision streams"
-    assert all(meta_from_camera_state(st) is not None for st in cfg.vision_pubs),\
-                                                     f"undefined vision stream spotted, probably misconfigured process: {cfg.vision_pubs}"
-    assert all(st in frs for st in cfg.vision_pubs), f"frs for this process must contain following vision streams: {cfg.vision_pubs}"
+    assert all(meta_from_camera_state(st) is not None for st in all_vision_pubs), \
+                                                          f"undefined vision stream spotted, probably misconfigured process: (vision pubs: {all_vision_pubs})"
+    required_vision_pubs = {m.camera_state for m in available_streams(lr)} & set(all_vision_pubs)
+    assert all(st in frs for st in required_vision_pubs), f"frs for this process must contain following vision streams: {required_vision_pubs}"
 
   all_msgs = sorted(lr, key=lambda msg: msg.logMonoTime)
   log_msgs = []

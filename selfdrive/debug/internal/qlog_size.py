@@ -5,9 +5,9 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 
-from cereal.services import service_list
-from tools.lib.logreader import LogReader
-from tools.lib.route import Route
+from cereal.services import SERVICE_LIST
+from openpilot.tools.lib.logreader import LogReader
+from openpilot.tools.lib.route import Route
 
 MIN_SIZE = 0.5  # Percent size of total to show as separate entry
 
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     msgs_by_type[m.which()].append(m.as_builder().to_bytes())
 
   qlog_by_type = defaultdict(list)
-  for name, service in service_list.items():
+  for name, service in SERVICE_LIST.items():
     if service.decimation is None:
       continue
 

@@ -6,7 +6,7 @@ import shutil
 import unittest
 import xml.etree.ElementTree as ET
 
-from selfdrive.ui.update_translations import TRANSLATIONS_DIR, LANGUAGES_FILE, update_translations
+from openpilot.selfdrive.ui.update_translations import TRANSLATIONS_DIR, LANGUAGES_FILE, update_translations
 
 TMP_TRANSLATIONS_DIR = os.path.join(TRANSLATIONS_DIR, "tmp")
 UNFINISHED_TRANSLATION_TAG = "<translation type=\"unfinished\""  # non-empty translations can be marked unfinished
@@ -113,6 +113,13 @@ class TestTranslations(unittest.TestCase):
         for line in self._read_translation_file(TRANSLATIONS_DIR, file).splitlines():
           self.assertFalse(line.strip().startswith(LOCATION_TAG),
                            f"Line contains location tag: {line.strip()}, remove all line numbers.")
+
+  def test_entities_error(self):
+    for name, file in self.translation_files.items():
+      with self.subTest(name=name, file=file):
+        cur_translations = self._read_translation_file(TRANSLATIONS_DIR, file)
+        matches = re.findall(r'@(\w+);', cur_translations)
+        self.assertEqual(len(matches), 0, f"The string(s) {matches} were found with '@' instead of '&'")
 
 
 if __name__ == "__main__":

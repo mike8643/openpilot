@@ -1,12 +1,12 @@
 # ruff: noqa: E501
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Dict, List, Union
 
 from cereal import car
-from selfdrive.car import dbc_dict
-from selfdrive.car.docs_definitions import CarFootnote, CarHarness, CarInfo, CarParts, Column
+from openpilot.selfdrive.car import dbc_dict
+from openpilot.selfdrive.car.docs_definitions import CarFootnote, CarHarness, CarInfo, CarParts, Column
 Ecu = car.CarParams.Ecu
 
 
@@ -61,7 +61,7 @@ class CarControllerParams:
     self.BRAKE_LOOKUP_V = [self.MAX_BRAKE, 0.]
 
 
-class CAR:
+class CAR(StrEnum):
   HOLDEN_ASTRA = "HOLDEN ASTRA RS-V BK 2017"
   VOLT = "CHEVROLET VOLT PREMIER 2017"
   CADILLAC_ATS = "CADILLAC ATS Premium Performance 2018"
