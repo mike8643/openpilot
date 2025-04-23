@@ -16,4 +16,4 @@
 [submodule "opendbc_repo"]
 	path = opendbc_repo
 	url = https://github.com/mike8643/opendbc
-	branch = brake06
+	branch = brake08
